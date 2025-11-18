@@ -1,0 +1,320 @@
+<!doctype html>
+
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI 联动仪表盘（示例）</title>
+  <style>
+    :root{
+      --bg: rgba(255,255,255,0.06);
+      --panel: rgba(255,255,255,0.08);
+      --accent: #b36b48;
+      --muted:#e6e6e6cc;
+      font-family: "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    html,body{height:100%;margin:0;background:linear-gradient(135deg,#f6f8fa 0%, #e9f2ff 100%);}
+    .wrap{height:100%;display:flex;align-items:stretch;gap:20px;padding:24px;box-sizing:border-box}/* left sidebar */
+.sidebar{width:120px;background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));backdrop-filter: blur(6px);border-radius:12px;padding:18px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.big-num{font-size:48px;color:var(--accent);font-weight:700}
+.small-num{font-size:28px;color:#111}
+.menu{margin-top:12px;align-self:flex-start}
+.menu button{display:flex;align-items:center;gap:8px;border:none;background:none;color:var(--muted);padding:8px;border-radius:8px;cursor:pointer}
+.menu button:hover{background:rgba(255,255,255,0.02);color:#fff}
+
+/* main area */
+.main{flex:1;display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:120px;gap:18px}
+.panel{background:var(--panel);border-radius:14px;padding:14px;backdrop-filter: blur(8px);box-shadow:0 6px 18px rgba(20,20,30,0.12);display:flex;align-items:center}
+
+/* search + autocomplete */
+.searchBar{grid-column:1 / span 2;display:flex;gap:12px;align-items:center}
+.search{flex:1;position:relative}
+.search input{width:100%;padding:14px 16px;border-radius:12px;border:none;font-size:16px;background:rgba(255,255,255,0.03);color:#111;outline:none}
+.autocomplete{position:absolute;left:0;right:0;top:calc(100% + 8px);background:#fff;color:#111;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,0.12);overflow:hidden;max-height:200px;display:none}
+.autocomplete.active{display:block}
+.autocomplete .item{padding:10px 12px;border-bottom:1px solid #eee;cursor:pointer}
+.autocomplete .item:hover{background:rgba(0,0,0,0.03)}
+.search .ai-hint{font-size:12px;color:#666;margin-top:6px}
+
+/* hero/picture */
+.hero{grid-column:1/ span 1;min-height:180px;flex-direction:column;justify-content:center}
+.hero img{width:100%;height:100%;object-fit:cover;border-radius:12px}
+
+/* circular knob */
+.knob{justify-content:center}
+.knob .dial{width:120px;height:120px;border-radius:60px;background:rgba(255,255,255,0.04);display:flex;align-items:center;justify-content:center;font-weight:700}
+
+/* clock */
+.clock{font-size:36px;font-weight:700}
+
+/* music */
+.music{display:flex;align-items:center;justify-content:space-between}
+.music .info{flex:1;padding-left:12px}
+.music .controls{display:flex;gap:8px}
+
+/* card grid */
+.wide{grid-column:1 / span 2;min-height:120px}
+.small{min-height:120px}
+
+/* compact styling */
+.rounded {border-radius:12px}
+
+/* footer */
+.footer{grid-column:1/span2;display:flex;gap:12px}
+
+/* tag filter */
+.tags{display:flex;gap:8px}
+.tag{padding:6px 10px;border-radius:999px;background:rgba(0,0,0,0.04);cursor:pointer}
+.tag.active{background:linear-gradient(90deg,var(--accent),#d89a7f);color:#fff}
+
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <aside class="sidebar">
+      <div class="avatar">🐱</div>
+      <div class="big-num" id="day">15</div>
+      <div class="small-num" id="hour">49</div>
+      <div class="menu">
+        <button id="toggleSidebar">◀</button>
+        <button id="nightMode">切换夜间</button>
+      </div>
+    </aside><main class="main">
+  <div class="panel searchBar">
+    <div class="search">
+      <input id="searchInput" placeholder="搜索（试试：海豚、音乐、周目标）" autocomplete="off">
+      <div class="autocomplete" id="acList"></div>
+      <div class="ai-hint">AI 联想：智能补全、相关过滤、建议卡片</div>
+    </div>
+    <div style="width:220px;text-align:right">
+      <div id="weather">16°C · 周五</div>
+      <div id="batterySmall">电量 100%</div>
+    </div>
+  </div>
+
+  <div class="panel hero rounded" id="mediaCard">
+    <img src="https://images.unsplash.com/photo-1546182990-dffeafbe841d?q=80&w=1400&auto=format&fit=crop&ixlib=rb-4.0.3&s=2b6c3efb0f0e0a7d9b2f4c6ad5c9c2cf" alt="hero">
+  </div>
+
+  <div class="panel knob rounded">
+    <div class="dial" id="knobVal">●</div>
+  </div>
+
+  <div class="panel clock rounded" id="clockPanel">
+    <div>
+      <div id="bigClock">--:--</div>
+      <div id="date">----</div>
+    </div>
+  </div>
+
+  <div class="panel music rounded" id="musicPanel">
+    <img src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=400&auto=format&fit=crop&ixlib=rb-4.0.3&s=2b6c3efb0f0e0a7d9b2f4c6ad5c9c2cf" width="80" height="80" style="border-radius:8px;object-fit:cover">
+    <div class="info">
+      <div id="trackTitle">Gracie Abrams - 21</div>
+      <div id="trackProgress">0:00 / 3:05</div>
+      <input id="seek" type="range" min="0" max="185" value="0" style="width:100%">
+    </div>
+    <div class="controls">
+      <button id="play">▶</button>
+      <button id="pause">⏸</button>
+    </div>
+  </div>
+
+  <div class="panel rounded small" id="quoteCard">
+    <div id="quote">人们之所以会怀念故乡，是因为心爱的人就在故乡。</div>
+  </div>
+
+  <div class="panel rounded small" id="batteryCard">
+    <div>
+      <div>Battery</div>
+      <div id="batteryPct">100%</div>
+    </div>
+  </div>
+
+  <div class="panel wide rounded" id="articleList">
+    <div style="display:flex;flex-wrap:wrap;gap:12px;width:100%" id="cardsContainer"></div>
+  </div>
+
+  <div class="panel rounded" id="goalCard">
+    <div style="width:100%;text-align:center">
+      <svg viewBox="0 0 100 50" width="100%" height="80">
+        <path id="arc" d="" stroke="#b36b48" stroke-width="6" fill="none" stroke-linecap="round"></path>
+        <text id="goalText" x="50" y="35" text-anchor="middle" font-size="12">60KM</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="panel footer rounded" style="align-items:center">
+    <div class="tags" id="tagRow"></div>
+    <div style="margin-left:auto">筛选结果：<span id="resultCount">0</span></div>
+  </div>
+
+</main>
+
+  </div>  <script>
+    // ---------- sample dataset (可由后端/AI扩展) ----------
+    const items = [
+      {id:1,title:'海豚救援记录',tags:['海洋','动物'],desc:'水族馆里的海牛与海豚...'},
+      {id:2,title:'周目标：60KM 骑行',tags:['目标','运动'],desc:'本周目标 60 公里'},
+      {id:3,title:'播放列表：Gracie Abrams',tags:['音乐'],desc:'情感民谣歌单'},
+      {id:4,title:'设计：玻璃质感面板',tags:['设计','UI'],desc:'模糊、毛玻璃效果'},
+      {id:5,title:'AI 联想：如何实现搜索补全',tags:['AI','技术'],desc:'示例教程'},
+      {id:6,title:'散文：怀念故乡',tags:['文章','散文'],desc:'关于思乡的感受'},
+    ];
+
+    // init UI
+    const acList = document.getElementById('acList');
+    const searchInput = document.getElementById('searchInput');
+    const cardsContainer = document.getElementById('cardsContainer');
+    const tagRow = document.getElementById('tagRow');
+    const resultCount = document.getElementById('resultCount');
+
+    const tags = Array.from(new Set(items.flatMap(i=>i.tags)));
+    tags.forEach(t=>{const b=document.createElement('div');b.className='tag';b.textContent=t;b.onclick=()=>{b.classList.toggle('active');applyFilters()};tagRow.appendChild(b)});
+
+    // render cards
+    function renderCards(list){
+      cardsContainer.innerHTML='';
+      list.forEach(i=>{
+        const c=document.createElement('div');c.className='panel rounded small';c.style.width='220px';c.style.flex='0 0 auto';
+        c.innerHTML=`<div style="font-weight:700">${i.title}</div><div style="font-size:12px;color:#444">${i.desc}</div><div style="margin-top:8px;color:#888;font-size:12px">标签: ${i.tags.join(', ')}</div>`;
+        cardsContainer.appendChild(c);
+      });
+      resultCount.textContent = list.length;
+    }
+    renderCards(items);
+
+    // ---------- simple fuzzy match for autocomplete (本地 AI 模拟) ----------
+    function fuzzySuggest(q){
+      if(!q) return [];
+      q=q.toLowerCase();
+      // 1. exact contains
+      const exact = items.filter(i=>i.title.toLowerCase().includes(q) || i.desc.toLowerCase().includes(q));
+      // 2. tag match
+      const tagMatch = items.filter(i=>i.tags.some(t=>t.toLowerCase().includes(q)));
+      // 3. token similarity (very naive)
+      const token = items.filter(i=>i.title.split(/\s|\-/).some(tok=>tok.toLowerCase().startsWith(q)));
+      const merged = [...new Set([...exact,...tagMatch,...token])];
+      return merged.slice(0,6);
+    }
+
+    searchInput.addEventListener('input',async (e)=>{
+      const q = e.target.value.trim();
+      // show local suggestions immediately
+      const local = fuzzySuggest(q);
+      showAutocomplete(local);
+
+      // --- 可选：调用后端AI接口获取更丰富联想（注释示例） ---
+      /*
+      if(q.length>1){
+        const resp = await fetch('/api/ai-suggest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({q})});
+        const data = await resp.json();
+        // data.suggestions 应为数组
+        showAutocomplete(data.suggestions);
+      }
+      */
+    });
+
+    function showAutocomplete(list){
+      acList.innerHTML='';
+      if(!list || list.length===0) {acList.classList.remove('active');return}
+      list.forEach(i=>{
+        const div=document.createElement('div');div.className='item';div.textContent=i.title + ' · ' + i.tags.join(', ');
+        div.onclick=()=>{ searchInput.value = i.title; acList.classList.remove('active'); applySearch(i.title); }
+        acList.appendChild(div);
+      });
+      acList.classList.add('active');
+    }
+
+    // press Enter -> search
+    searchInput.addEventListener('keydown',(e)=>{
+      if(e.key==='Enter'){
+        applySearch(searchInput.value.trim());
+        acList.classList.remove('active');
+      }
+    });
+
+    // ---------- search / filter / AI 联动示例 ----------
+    function applySearch(q){
+      if(!q) { renderCards(items); return }
+      // first: local filter
+      let res = items.filter(i=>i.title.toLowerCase().includes(q.toLowerCase()) || i.desc.toLowerCase().includes(q.toLowerCase()) || i.tags.some(t=>t.toLowerCase().includes(q.toLowerCase())));
+      // second: AI-enhanced re-ranking (模拟) — 将包含关键词的项靠前
+      res.sort((a,b)=> (a.title.toLowerCase().includes(q.toLowerCase())? -1:0));
+      renderCards(res);
+
+      // link: 更新其他部件（联动）
+      // 如果搜索到音乐则自动切换播放面板
+      const music = res.find(r=>r.tags.includes('音乐'));
+      if(music){ document.getElementById('trackTitle').textContent = music.title; }
+
+      // 如果是目标类则高亮目标条
+      const goal = res.find(r=>r.tags.includes('目标'));
+      if(goal){ document.getElementById('goalText').textContent = '60KM'; drawArc(0.6); }
+    }
+
+    function applyFilters(){
+      const active = Array.from(document.querySelectorAll('.tag.active')).map(n=>n.textContent);
+      if(active.length===0){ renderCards(items); return }
+      const res = items.filter(i=> active.every(a=>i.tags.includes(a)));
+      renderCards(res);
+    }
+
+    // ---------- simple clock ----------
+    function tick(){
+      const d=new Date();
+      const hh = String(d.getHours()).padStart(2,'0');
+      const mm = String(d.getMinutes()).padStart(2,'0');
+      document.getElementById('bigClock').textContent = `${hh}:${mm}`;
+      document.getElementById('date').textContent = d.toLocaleDateString();
+    }
+    setInterval(tick,1000);tick();
+
+    // ---------- music controls (模拟) ----------
+    const seek = document.getElementById('seek');
+    const playBtn = document.getElementById('play');
+    const pauseBtn = document.getElementById('pause');
+    let playing=false,cur=0,dur=185,tid=null;
+    playBtn.onclick=()=>{ if(playing) return; playing=true; tid = setInterval(()=>{ cur++; if(cur>dur) clearInterval(tid); seek.value=cur; document.getElementById('trackProgress').textContent = `${formatTime(cur)} / ${formatTime(dur)}` },1000)};
+    pauseBtn.onclick=()=>{ playing=false; clearInterval(tid)};
+    seek.addEventListener('input',()=>{ cur = Number(seek.value); document.getElementById('trackProgress').textContent = `${formatTime(cur)} / ${formatTime(dur)}` });
+    function formatTime(s){ const m=Math.floor(s/60); const r=s%60; return `${m}:${String(r).padStart(2,'0')}` }
+
+    // ---------- battery widget (模拟) ----------
+    function setBattery(pct){ document.getElementById('batteryPct').textContent = pct + '%'; document.getElementById('batterySmall').textContent = '电量 ' + pct + '%'; }
+    setBattery(100);
+
+    // ---------- goal arc ----------
+    function drawArc(ratio){
+      const arc = document.getElementById('arc');
+      // draw from 180deg to 0deg (semi-circle)
+      const start = Math.PI; const end = Math.PI*(1 - ratio);
+      // approximate path in svg
+      const x1 = 50 + 40*Math.cos(start);
+      const y1 = 40 + 40*Math.sin(start);
+      const x2 = 50 + 40*Math.cos(Math.PI - ratio*Math.PI);
+      const y2 = 40 + 40*Math.sin(Math.PI - ratio*Math.PI);
+      const large = ratio>0.5?1:0;
+      const d = `M ${x1} ${y1} A 40 40 0 ${large} 0 ${x2} ${y2}`;
+      arc.setAttribute('d',d);
+    }
+    drawArc(0.6);
+
+    // ---------- hint: how to integrate real AI suggestions (OpenAI) ----------
+    /*
+      在生产环境里，建议后端负责调用 OpenAI（或其他模型）来生成联想建议，前端只负责展示和交互。
+      示例思路：
+      1. 前端将用户输入发送到后端 /api/ai-suggest
+      2. 后端调用 OpenAI 的 completions 或 embeddings 接口，基于向量相似度或 prompt-engineering 返回建议
+      3. 后端返回 JSON，前端展示 autocomplete 并将选中项作为过滤/高亮条件
+
+      伪代码（后端）：
+      const prompt = `用户输入：${q}\n请返回相关的 5 个标题或短语，优先考虑与本系统 items 数据集相关的条目。`;
+      // 调用 OpenAI 并解析响应
+    */
+
+    // ---------- optionally: keyboard shortcuts ----------
+    document.addEventListener('keydown',(e)=>{ if(e.key==='/'){ e.preventDefault(); searchInput.focus(); } });
+
+  </script></body>
+</html>
